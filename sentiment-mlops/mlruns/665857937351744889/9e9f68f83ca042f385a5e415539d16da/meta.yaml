@@ -1,0 +1,14 @@
+artifact_uri: file:///workspaces/sentiments/sentiment-mlops/mlruns/665857937351744889/9e9f68f83ca042f385a5e415539d16da/artifacts
+end_time: 1751126290870
+entry_point_name: ''
+experiment_id: '665857937351744889'
+lifecycle_stage: active
+run_id: 9e9f68f83ca042f385a5e415539d16da
+run_name: LogisticRegression_20250628_155810
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751126290851
+status: 3
+tags: []
+user_id: codespace

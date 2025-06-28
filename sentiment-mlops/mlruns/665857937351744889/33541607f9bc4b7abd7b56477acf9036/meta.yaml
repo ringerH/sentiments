@@ -1,0 +1,14 @@
+artifact_uri: file:///workspaces/sentiments/sentiment-mlops/mlruns/665857937351744889/33541607f9bc4b7abd7b56477acf9036/artifacts
+end_time: 1751125769589
+entry_point_name: ''
+experiment_id: '665857937351744889'
+lifecycle_stage: active
+run_id: 33541607f9bc4b7abd7b56477acf9036
+run_name: MultinomialNB_20250628_154929
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751125769556
+status: 3
+tags: []
+user_id: codespace

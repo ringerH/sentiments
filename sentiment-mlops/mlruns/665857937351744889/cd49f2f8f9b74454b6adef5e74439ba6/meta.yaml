@@ -1,0 +1,14 @@
+artifact_uri: file:///workspaces/sentiments/sentiment-mlops/mlruns/665857937351744889/cd49f2f8f9b74454b6adef5e74439ba6/artifacts
+end_time: 1751125769528
+entry_point_name: ''
+experiment_id: '665857937351744889'
+lifecycle_stage: active
+run_id: cd49f2f8f9b74454b6adef5e74439ba6
+run_name: LinearSVC_20250628_154929
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751125769512
+status: 3
+tags: []
+user_id: codespace

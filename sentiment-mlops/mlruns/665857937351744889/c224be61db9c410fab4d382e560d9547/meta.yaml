@@ -1,0 +1,14 @@
+artifact_uri: file:///workspaces/sentiments/sentiment-mlops/mlruns/665857937351744889/c224be61db9c410fab4d382e560d9547/artifacts
+end_time: 1751126290847
+entry_point_name: ''
+experiment_id: '665857937351744889'
+lifecycle_stage: active
+run_id: c224be61db9c410fab4d382e560d9547
+run_name: RandomForest_20250628_155810
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751126290704
+status: 3
+tags: []
+user_id: codespace

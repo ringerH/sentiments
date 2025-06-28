@@ -1,6 +1,3 @@
-"""
-Data loading and basic preprocessing utilities
-"""
 import pandas as pd
 import logging
 from pathlib import Path
@@ -128,18 +125,22 @@ class DataLoader:
 
 def load_sample_data():
     """Load sample data for testing"""
-    # Create sample data if no real data is available
     sample_data = pd.DataFrame({
         'Sentence': [
             'The stock market is performing very well today',
-            'I am worried about the economic downturn',
+            'I am worried about the economic downturn', 
             'The company reported neutral earnings this quarter',
             'HODL to the moon! This coin is bullish',
-            'FUD spreading everywhere, market looks bearish'
+            'FUD spreading everywhere, market looks bearish',
+            'Great earnings beat expectations',
+            'Terrible loss this quarter',
+            'Average performance as expected',
+            'Bull run continues strong',
+            'Bear market fears growing'
         ],
-        'Sentiment': ['positive', 'negative', 'neutral', 'positive', 'negative']
+        'Sentiment': ['positive', 'negative', 'neutral', 'positive', 'negative', 
+                     'positive', 'negative', 'neutral', 'positive', 'negative']
     })
-    
     return sample_data
 
 

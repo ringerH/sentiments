@@ -20,7 +20,7 @@ DATA_CONFIG = {
     "input_file": "data.csv",
     "text_column": "Sentence",
     "target_column": "Sentiment",
-    "test_size": 0.2,
+    "test_size": 0.4,
     "random_state": 42
 }
 

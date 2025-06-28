@@ -1,0 +1,14 @@
+artifact_uri: file:///workspaces/sentiments/sentiment-mlops/mlruns/665857937351744889/acda7c8722ce4f78a022e88e12899c0e/artifacts
+end_time: 1751126290915
+entry_point_name: ''
+experiment_id: '665857937351744889'
+lifecycle_stage: active
+run_id: acda7c8722ce4f78a022e88e12899c0e
+run_name: GaussianNB_20250628_155810
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1751126290894
+status: 3
+tags: []
+user_id: codespace

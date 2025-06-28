@@ -1,0 +1,6 @@
+artifact_location: file:///workspaces/sentiments/sentiment-mlops/mlruns/665857937351744889
+creation_time: 1751125768011
+experiment_id: '665857937351744889'
+last_update_time: 1751125768011
+lifecycle_stage: active
+name: sentiment-analysis

@@ -111,6 +111,11 @@ def vader_scores(texts):
     sia = SentimentIntensityAnalyzer()
     return np.array([[sia.polarity_scores(t)['compound']] for t in texts])
 
+def identity_tokenizer(x):
+    return str.split(x)
+
+def identity_preprocessor(x):
+    return x
 
 class TextPreprocessor:
     """Complete text preprocessing pipeline"""
@@ -127,8 +132,8 @@ class TextPreprocessor:
             ("acro", AcronymExpander()),
             ("clean", SpacyCleaner()),
             ("tfidf", TfidfVectorizer(
-                tokenizer=str.split,
-                preprocessor=lambda x: x,
+                tokenizer=identity_tokenizer,
+                preprocessor=identity_preprocessor,
                 token_pattern=None,
                 min_df=self.min_df,
                 max_df=self.max_df
