@@ -32,9 +32,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Set up Minikube
-      uses: medyagh/setup-minikube@master
+      uses: medyagh/setup-minikube@v0.0.16
       with:
-        minikube-version: 'v1.25.0'
+        minikube-version: 'latest'
         kubernetes-version: 'v1.25.0'
         driver: 'docker'
         memory: '4096mb'
