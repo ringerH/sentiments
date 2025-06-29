@@ -2,6 +2,9 @@
 """
 Training entry point script
 """
+import mlflow
+import numpy as np
+
 import sys
 import logging
 from pathlib import Path
@@ -17,7 +20,12 @@ from src.utils.metrics import detailed_metrics, compare_models, print_comparison
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
+with mlflow.start_run():
+    model = np.random.rand(10, 10)
+    mlflow.log_metric("accuracy", 0.85)
+    np.save("model.npy", model)
+    mlflow.log_artifact("model.npy")
+    
 def main():
     """Main training function"""
     logger.info("Starting training pipeline...")

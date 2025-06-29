@@ -1,0 +1,68 @@
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r docker/requirements.txt
+    - name: Run tests
+      run: |
+        python -m pytest tests/ --cov=src --cov-report=term-missing
+    - name: Coverage check
+      run: |
+        python -m pytest tests/ --cov=src --cov-fail-under=67
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Minikube
+      uses: engineerd/setup-minikube@v2
+      with:
+        minikube-version: 'v1.25.0'
+        kubernetes-version: 'v1.25.0'
+        driver: 'docker'
+    - name: Start Minikube
+      run: minikube start --memory=4096mb --cpus=2
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.25.0'
+    - name: Configure kubectl
+      run: |
+        mkdir -p $HOME/.kube
+        minikube update-context
+        kubectl config view --minikube
+    - name: Build Docker images in Minikube
+      run: |
+        # Use Minikube's Docker environment
+        eval $(minikube docker-env)
+        docker build -f docker/Dockerfile.train -t ml-train:latest .
+        docker build -f docker/Dockerfile.serve -t ml-serve:latest .
+    - name: Install Argo Workflows
+      run: |
+        kubectl apply -f https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/install.yaml
+        kubectl wait --for=condition=available --timeout=300s deployment/argo-server -n argo
+    - name: Install Argo CLI
+      run: |
+        curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/argo-linux-amd64
+        chmod +x argo-linux-amd64
+        sudo mv argo-linux-amd64 /usr/local/bin/argo
+    - name: Trigger Argo Workflow
+      run: |
+        argo submit ci-cd/argo-workflows/training-pipeline.yaml -n argo --serviceaccount argo

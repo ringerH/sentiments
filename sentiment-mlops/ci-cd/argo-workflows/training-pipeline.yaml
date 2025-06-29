@@ -1,0 +1,87 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: ml-pipeline-
+spec:
+  entrypoint: ml-pipeline
+  templates:
+  - name: ml-pipeline
+    dag:
+      tasks:
+      - name: preprocess-data
+        template: preprocess
+      - name: train-model
+        template: train
+        dependencies: [preprocess-data]
+      - name: evaluate-model
+        template: evaluate
+        dependencies: [train-model]
+      - name: serve-model
+        template: serve
+        dependencies: [evaluate-model]
+
+  - name: preprocess
+    container:
+      image: ml-train:latest
+      imagePullPolicy: Never
+      command: [python, /app/scripts/train.py, --step=preprocess]
+      workingDir: /app
+      volumeMounts:
+      - name: source
+        mountPath: /app
+
+  - name: train
+    container:
+      image: ml-train:latest
+      imagePullPolicy: Never
+      command: [python, /app/scripts/train.py, --step=train]
+      workingDir: /app
+      volumeMounts:
+      - name: source
+        mountPath: /app
+      - name: model-store
+        mountPath: /models
+    outputs:
+      artifacts:
+      - name: trained-model
+        path: /models/model.pkl
+
+  - name: evaluate
+    container:
+      image: ml-train:latest
+      imagePullPolicy: Never
+      command: [python, /app/scripts/evaluate.py]
+      workingDir: /app
+      volumeMounts:
+      - name: source
+        mountPath: /app
+      - name: model-store
+        mountPath: /models
+
+  - name: serve
+    container:
+      image: ml-serve:latest
+      imagePullPolicy: Never
+      command: [python, /app/scripts/predict.py]
+      workingDir: /app
+      volumeMounts:
+      - name: model-store
+        mountPath: /models
+      ports:
+      - containerPort: 5000
+
+  volumeClaimTemplates:
+  - metadata:
+      name: source
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+  - metadata:
+      name: model-store
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2Gi

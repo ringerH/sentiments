@@ -1,0 +1,43 @@
+pipeline {
+    agent any
+    
+    environment {
+        PYTHON_VERSION = '3.11.11'
+    }
+    
+    stages {
+        stage('Setup') {
+            steps {
+                sh 'python3 --version'
+                sh 'pip install -r requirements.txt'
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh 'python -m pytest --cov=. --cov-report=term-missing --cov-fail-under=67'
+            }
+        }
+        
+        stage('Deploy to Argo') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh 'argo submit argo-workflows/training-pipeline.yaml'
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+    }
+}
