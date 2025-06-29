@@ -1,15 +1,46 @@
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
-joblib==1.5.1
-matplotlib==3.10.3
-matplotlib-inline==0.1.7
-mlflow==3.1.1
-mlflow-skinny==3.1.1
-numpy==2.2.6
+# Core ML libraries
 pandas==2.2.3
+numpy==2.2.6
 scikit-learn==1.6.1
-seaborn==0.13.2
+nltk>=3.7
+
+# Text processing
 spacy==3.8.7
 spacy-legacy==3.0.12
 spacy-loggers==1.0.5
-emoji
-nltk
+emoji>=2.0.0
+
+# Visualization
+plotly>=5.10.0
+matplotlib==3.10.3
+matplotlib-inline==0.1.7
+seaborn==0.13.2
+
+# MLOps tools
+mlflow==3.1.1
+mlflow-skinny==3.1.1
+
+# API framework
+fastapi>=0.85.0
+uvicorn>=0.18.0
+
+# Testing
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Code quality
+flake8>=5.0.0
+black>=22.0.0
+
+# Monitoring
+prometheus-client>=0.15.0
+
+# Development
+jupyter>=1.0.0
+ipykernel>=6.15.0
+
+# Additional dependencies
+joblib==1.5.1
+
+# Spacy model
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
