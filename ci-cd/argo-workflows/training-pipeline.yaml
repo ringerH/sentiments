@@ -4,6 +4,16 @@ metadata:
   generateName: ml-pipeline-
 spec:
   entrypoint: ml-pipeline
+  
+  volumeClaimTemplates:
+  - metadata:
+      name: model-store
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2Gi
+  
   templates:
   - name: ml-pipeline
     dag:
@@ -24,21 +34,21 @@ spec:
     container:
       image: ml-train:latest
       imagePullPolicy: Never
-      command: [python, /app/scripts/train.py, --step=preprocess]
+      command: [python]
+      args: ["/app/scripts/train.py", "--step=preprocess"]
       workingDir: /app
       volumeMounts:
-      - name: source
-        mountPath: /app
+      - name: model-store
+        mountPath: /models
 
   - name: train
     container:
       image: ml-train:latest
       imagePullPolicy: Never
-      command: [python, /app/scripts/train.py, --step=train]
+      command: [python]
+      args: ["/app/scripts/train.py", "--step=train"]
       workingDir: /app
       volumeMounts:
-      - name: source
-        mountPath: /app
       - name: model-store
         mountPath: /models
     outputs:
@@ -50,11 +60,10 @@ spec:
     container:
       image: ml-train:latest
       imagePullPolicy: Never
-      command: [python, /app/scripts/evaluate.py]
+      command: [python]
+      args: ["/app/scripts/evaluate.py"]
       workingDir: /app
       volumeMounts:
-      - name: source
-        mountPath: /app
       - name: model-store
         mountPath: /models
 
@@ -62,26 +71,11 @@ spec:
     container:
       image: ml-serve:latest
       imagePullPolicy: Never
-      command: [python, /app/scripts/predict.py]
+      command: [python]
+      args: ["/app/scripts/predict.py"]
       workingDir: /app
       volumeMounts:
       - name: model-store
         mountPath: /models
       ports:
       - containerPort: 5000
-
-  volumeClaimTemplates:
-  - metadata:
-      name: source
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 1Gi
-  - metadata:
-      name: model-store
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 2Gi
