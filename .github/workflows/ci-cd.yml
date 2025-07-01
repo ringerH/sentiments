@@ -72,7 +72,7 @@ jobs:
         sudo mv argo-linux-amd64 /usr/local/bin/argo
         
         # Verify installation
-        argo version --client
+        argo version 
     
     - name: Create ServiceAccount and RBAC
       run: |
