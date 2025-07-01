@@ -40,16 +40,6 @@ jobs:
         memory: '4096mb'
         cpus: '2'
     
-    # Alternative 2: Manual Minikube setup
-    # - name: Install Minikube
-    #   run: |
-    #     curl -Lo minikube https://storage.googleapis.com/minikube/releases/v1.25.0/minikube-linux-amd64
-    #     chmod +x minikube
-    #     sudo mv minikube /usr/local/bin/
-    # - name: Start Minikube
-    #   run: |
-    #     minikube start --driver=docker --memory=4096mb --cpus=2 --kubernetes-version=v1.25.0
-    
     - name: Set up kubectl
       uses: azure/setup-kubectl@v3
       with:
@@ -73,12 +63,34 @@ jobs:
         kubectl apply -n argo -f https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/install.yaml
         kubectl wait --for=condition=available --timeout=300s deployment/argo-server -n argo
     
-    - name: Install Argo CLI
+    - name: Install Argo CLI (Fixed)
       run: |
-        curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/argo-linux-amd64
+        # Download and verify the Argo CLI
+        curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/argo-linux-amd64.gz
+        gunzip argo-linux-amd64.gz
         chmod +x argo-linux-amd64
         sudo mv argo-linux-amd64 /usr/local/bin/argo
+        
+        # Verify installation
+        argo version --client
+    
+    - name: Create ServiceAccount and RBAC
+      run: |
+        # Create service account for Argo workflows
+        kubectl create serviceaccount argo -n argo || true
+        
+        # Create role binding for the service account
+        kubectl create rolebinding argo-binding \
+          --clusterrole=argo-role \
+          --serviceaccount=argo:argo \
+          -n argo || true
     
     - name: Trigger Argo Workflow
       run: |
-        argo submit ci-cd/argo-workflows/training-pipeline.yaml -n argo --serviceaccount argo
+        # Submit the workflow with proper error handling
+        if argo submit ci-cd/argo-workflows/training-pipeline.yaml -n argo --serviceaccount argo; then
+          echo "Workflow submitted successfully"
+        else
+          echo "Failed to submit workflow"
+          exit 1
+        fi
