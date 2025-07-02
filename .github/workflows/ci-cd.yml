@@ -39,58 +39,113 @@ jobs:
         driver: 'docker'
         memory: '4096mb'
         cpus: '2'
-    
     - name: Set up kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'v1.25.0'
-    
     - name: Configure kubectl
       run: |
         mkdir -p $HOME/.kube
         minikube update-context
         kubectl config use-context minikube
-    
     - name: Build Docker images in Minikube
       run: |
         eval $(minikube docker-env)
         docker build -f docker/Dockerfile.train -t ml-train:latest .
         docker build -f docker/Dockerfile.serve -t ml-serve:latest .
-    
+    - name: Install MinIO
+      run: |
+        kubectl apply -n argo -f - <<EOF
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: minio
+          namespace: argo
+        spec:
+          type: ClusterIP
+          ports:
+            - port: 9000
+              targetPort: 9000
+              protocol: TCP
+          selector:
+            app: minio
+        ---
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: minio
+          namespace: argo
+        spec:
+          selector:
+            matchLabels:
+              app: minio
+          strategy:
+            type: Recreate
+          template:
+            metadata:
+              labels:
+                app: minio
+            spec:
+              containers:
+              - name: minio
+                image: minio/minio:latest
+                args:
+                - server
+                - /data
+                - --console-address=:9001
+                env:
+                - name: MINIO_ROOT_USER
+                  value: "minioadmin"
+                - name: MINIO_ROOT_PASSWORD
+                  value: "minioadmin"
+                ports:
+                - containerPort: 9000
+                - containerPort: 9001
+                volumeMounts:
+                - name: data
+                  mountPath: /data
+              volumes:
+              - name: data
+                emptyDir: {}
+        EOF
+        kubectl wait --for=condition=ready pod -l app=minio -n argo --timeout=300s
+    - name: Create MinIO Bucket
+      run: |
+        kubectl run minio-init -n argo --image=minio/mc --restart=Never --command -- /bin/sh -c \
+          "mc alias set minio http://minio:9000 minioadmin minioadmin && mc mb minio/artifacts"
+        kubectl wait --for=condition=complete job/minio-init -n argo --timeout=60s
+    - name: Configure Argo Workflows for MinIO
+      run: |
+        kubectl apply -n argo -f - <<EOF
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: argo-workflows-config
+          namespace: argo
+        data:
+          workflowDefaults: |
+            spec:
+              artifactRepository:
+                s3:
+                  endpoint: minio:9000
+                  bucket: artifacts
+                  accessKey: minioadmin
+                  secretKey: minioadmin
+                  insecure: true
+        EOF
+        kubectl patch deployment argo-server -n argo --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "ARGO_WORKFLOW_CONFIG_MAP", "value": "argo-workflows-config"}}]'
+        kubectl rollout restart deployment argo-server -n argo
+        kubectl wait --for=condition=available --timeout=300s deployment/argo-server -n argo
     - name: Install Argo Workflows
       run: |
         kubectl create namespace argo || true
         kubectl apply -n argo -f https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/install.yaml
         kubectl wait --for=condition=available --timeout=300s deployment/argo-server -n argo
-    
-    - name: Install Argo CLI (Fixed)
+    - name: Install Argo CLI
       run: |
-        # Download and verify the Argo CLI
-        curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/argo-linux-amd64.gz
-        gunzip argo-linux-amd64.gz
+        curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/argo-linux-amd64
         chmod +x argo-linux-amd64
         sudo mv argo-linux-amd64 /usr/local/bin/argo
-        
-        # Verify installation
-        argo version 
-    
-    - name: Create ServiceAccount and RBAC
-      run: |
-        # Create service account for Argo workflows
-        kubectl create serviceaccount argo -n argo || true
-        
-        # Create role binding for the service account
-        kubectl create rolebinding argo-binding \
-          --clusterrole=argo-role \
-          --serviceaccount=argo:argo \
-          -n argo || true
-    
     - name: Trigger Argo Workflow
       run: |
-        # Submit the workflow with proper error handling
-        if argo submit ci-cd/argo-workflows/training-pipeline.yaml -n argo --serviceaccount argo; then
-          echo "Workflow submitted successfully"
-        else
-          echo "Failed to submit workflow"
-          exit 1
-        fi
+        argo submit ci-cd/argo-workflows/training-pipeline.yaml -n argo --serviceaccount argo

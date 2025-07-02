@@ -4,16 +4,6 @@ metadata:
   generateName: ml-pipeline-
 spec:
   entrypoint: ml-pipeline
-  
-  volumeClaimTemplates:
-  - metadata:
-      name: model-store
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 2Gi
-  
   templates:
   - name: ml-pipeline
     dag:
@@ -34,19 +24,14 @@ spec:
     container:
       image: ml-train:latest
       imagePullPolicy: Never
-      command: [python]
-      args: ["/app/scripts/train.py", "--step=preprocess"]
+      command: [python, /app/scripts/train.py, --step=preprocess]
       workingDir: /app
-      volumeMounts:
-      - name: model-store
-        mountPath: /models
 
   - name: train
     container:
       image: ml-train:latest
       imagePullPolicy: Never
-      command: [python]
-      args: ["/app/scripts/train.py", "--step=train"]
+      command: [python, /app/scripts/train.py, --step=train]
       workingDir: /app
       volumeMounts:
       - name: model-store
@@ -54,14 +39,15 @@ spec:
     outputs:
       artifacts:
       - name: trained-model
-        path: /models/model.pkl
+        path: /models
+        archive:
+          none: {}
 
   - name: evaluate
     container:
       image: ml-train:latest
       imagePullPolicy: Never
-      command: [python]
-      args: ["/app/scripts/evaluate.py"]
+      command: [python, /app/scripts/evaluate.py, --test-data]
       workingDir: /app
       volumeMounts:
       - name: model-store
@@ -71,11 +57,175 @@ spec:
     container:
       image: ml-serve:latest
       imagePullPolicy: Never
-      command: [python]
-      args: ["/app/scripts/predict.py"]
+      command: [python, /app/scripts/predict.py, --interactive]
       workingDir: /app
       volumeMounts:
       - name: model-store
         mountPath: /models
       ports:
       - containerPort: 5000
+
+  volumeClaimTemplates:
+  - metadata:
+      name: model-store
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2 Hilary
+
+#### Updated `ci-cd.yml`
+Adds MinIO setup and configuration to the `build-and-deploy` job.
+
+<xaiArtifact artifact_id="2879a69b-45c4-4214-85c3-269badd0b468" artifact_version_id="6de3a5e8-eac1-4d46-bf10-bdaaa13efe04" title="ci-cd.yml" contentType="text/yaml">
+name: CI/CD Pipeline
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r docker/requirements.txt
+    - name: Run tests
+      run: |
+        python -m pytest tests/ --cov=src --cov-report=term-missing
+    - name: Coverage check
+      run: |
+        python -m pytest tests/ --cov=src --cov-fail-under=67
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Minikube
+      uses: medyagh/setup-minikube@v0.0.16
+      with:
+        minikube-version: 'latest'
+        kubernetes-version: 'v1.25.0'
+        driver: 'docker'
+        memory: '4096mb'
+        cpus: '2'
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.25.0'
+    - name: Configure kubectl
+      run: |
+        mkdir -p $HOME/.kube
+        minikube update-context
+        kubectl config use-context minikube
+    - name: Build Docker images in Minikube
+      run: |
+        eval $(minikube docker-env)
+        docker build -f docker/Dockerfile.train -t ml-train:latest .
+        docker build -f docker/Dockerfile.serve -t ml-serve:latest .
+    - name: Install MinIO
+      run: |
+        kubectl apply -n argo -f - <<EOF
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: minio
+          namespace: argo
+        spec:
+          type: ClusterIP
+          ports:
+            - port: 9000
+              targetPort: 9000
+              protocol: TCP
+          selector:
+            app: minio
+        ---
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: minio
+          namespace: argo
+        spec:
+          selector:
+            matchLabels:
+              app: minio
+          strategy:
+            type: Recreate
+          template:
+            metadata:
+              labels:
+                app: minio
+            spec:
+              containers:
+              - name: minio
+                image: minio/minio:latest
+                args:
+                - server
+                - /data
+                - --console-address=:9001
+                env:
+                - name: MINIO_ROOT_USER
+                  value: "minioadmin"
+                - name: MINIO_ROOT_PASSWORD
+                  value: "minioadmin"
+                ports:
+                - containerPort: 9000
+                - containerPort: 9001
+                volumeMounts:
+                - name: data
+                  mountPath: /data
+              volumes:
+              - name: data
+                emptyDir: {}
+        EOF
+        kubectl wait --for=condition=ready pod -l app=minio -n argo --timeout=300s
+    - name: Create MinIO Bucket
+      run: |
+        kubectl run minio-init -n argo --image=minio/mc --restart=Never --command -- /bin/sh -c \
+          "mc alias set minio http://minio:9000 minioadmin minioadmin && mc mb minio/artifacts"
+        kubectl wait --for=condition=complete job/minio-init -n argo --timeout=60s
+    - name: Configure Argo Workflows for MinIO
+      run: |
+        kubectl apply -n argo -f - <<EOF
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: argo-workflows-config
+          namespace: argo
+        data:
+          workflowDefaults: |
+            spec:
+              artifactRepository:
+                s3:
+                  endpoint: minio:9000
+                  bucket: artifacts
+                  accessKey: minioadmin
+                  secretKey: minioadmin
+                  insecure: true
+        EOF
+        kubectl patch deployment argo-server -n argo --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "ARGO_WORKFLOW_CONFIG_MAP", "value": "argo-workflows-config"}}]'
+        kubectl rollout restart deployment argo-server -n argo
+        kubectl wait --for=condition=available --timeout=300s deployment/argo-server -n argo
+    - name: Install Argo Workflows
+      run: |
+        kubectl create namespace argo || true
+        kubectl apply -n argo -f https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/install.yaml
+        kubectl wait --for=condition=available --timeout=300s deployment/argo-server -n argo
+    - name: Install Argo CLI
+      run: |
+        curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.4.6/argo-linux-amd64
+        chmod +x argo-linux-amd64
+        sudo mv argo-linux-amd64 /usr/local/bin/argo
+    - name: Trigger Argo Workflow
+      run: |
+        argo submit ci-cd/argo-workflows/training-pipeline.yaml -n argo --serviceaccount argo
